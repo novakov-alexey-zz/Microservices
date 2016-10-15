@@ -8,7 +8,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpResponse, Multipart, StatusCodes}
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.FileIO
+import akka.stream.scaladsl.{FileIO, Flow}
 import akka.util.ByteString
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
@@ -23,9 +23,8 @@ object HttpUpload extends App with StrictLogging {
 
   val conf = ConfigFactory.load()
 
-  // this route does not work
   val uploadFile =
-    path("fileUpload") {
+    path("upload" / "csv") {
       post {
         fileUpload("csv") {
           case (metadata, byteSource) =>
@@ -34,14 +33,13 @@ object HttpUpload extends App with StrictLogging {
             val writeResult = byteSource.runWith(sink)
             onSuccess(writeResult) { result =>
               result.status match {
-                case Success(_) => complete(s"Successfully written ${result.count} bytes")
-                case Failure(e) => complete(HttpResponse(StatusCodes.InternalServerError, entity = "Error in file uploading"))
+                case Success(_) => complete(s"Successfully written ${result.count} bytes\n")
+                case Failure(e) => complete(HttpResponse(StatusCodes.InternalServerError, entity = "Error in file uploading\n"))
               }
             }
         }
       }
     }
-
 
   def uploadFile2 = {
     path("upload" / "csv") {
@@ -50,9 +48,9 @@ object HttpUpload extends App with StrictLogging {
           val outFileName = System.currentTimeMillis() + ".csv"
           val filePath = Paths.get(conf.getString("upload.output-path")).resolve(outFileName).toString
           processFile(filePath, fileData).map { fileSize =>
-            HttpResponse(StatusCodes.OK, entity = s"File successfully uploaded. File size is $fileSize")
+            HttpResponse(StatusCodes.OK, entity = s"File successfully uploaded. File size is $fileSize\n")
           }.recover {
-            case ex: Exception => HttpResponse(StatusCodes.InternalServerError, entity = "Error in file uploading")
+            case ex: Exception => HttpResponse(StatusCodes.InternalServerError, entity = "Error in file uploading\n")
           }
         }
       }
@@ -73,5 +71,5 @@ object HttpUpload extends App with StrictLogging {
     source.runFold(0)(_ + _)
   }
 
-  Http().bindAndHandle(uploadFile2, interface = "localhost", port = 8080)
+  Http().bindAndHandle(uploadFile, interface = "localhost", port = 8080)
 }
