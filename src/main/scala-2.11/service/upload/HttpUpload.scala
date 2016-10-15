@@ -8,20 +8,22 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpResponse, Multipart, StatusCodes}
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{FileIO, Source}
+import akka.stream.scaladsl.FileIO
 import akka.util.ByteString
 import com.typesafe.config.ConfigFactory
+import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-object HttpUpload extends App {
+object HttpUpload extends App with StrictLogging {
   implicit val system = ActorSystem()
   implicit val executor = system.dispatcher
   implicit val materializer = ActorMaterializer()
 
   val conf = ConfigFactory.load()
 
+  // this route does not work
   val uploadFile =
     path("fileUpload") {
       post {
@@ -59,15 +61,20 @@ object HttpUpload extends App {
 
   private def processFile(filePath: String, fileData: Multipart.FormData): Future[Int] = {
     val fileOutput = new FileOutputStream(filePath)
+    val chunkSize = 50000
+
     val source = fileData.parts.mapAsync(1) { bodyPart ⇒
-      def writeFileOnLocal(array: Array[Byte], byteString: ByteString): Array[Byte] = {
-        val byteArray: Array[Byte] = byteString.toArray
+      def writeFile(count: Int, byteString: Seq[ByteString]) = {
+        val byteArray = byteString.foldLeft(Array[Byte]())((a, bs) => a ++ bs)
+        logger.debug("group length = {}", byteArray.length)
         fileOutput.write(byteArray)
-        array ++ byteArray
+        count + byteArray.length
       }
-      bodyPart.entity.dataBytes.runFold(Array[Byte]())(writeFileOnLocal)
+      bodyPart.entity.dataBytes
+        .grouped(chunkSize)
+        .runFold(0)(writeFile)
     }
-    source.runFold(0)(_ + _.length)
+    source.runFold(0)(_ + _)
   }
 
   Http().bindAndHandle(uploadFile2, interface = "localhost", port = 8080)
