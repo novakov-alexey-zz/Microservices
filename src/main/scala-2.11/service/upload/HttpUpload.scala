@@ -50,7 +50,7 @@ object HttpUpload extends App with StrictLogging {
           val outFileName = System.currentTimeMillis() + ".csv"
           val filePath = Paths.get(conf.getString("upload.output-path")).resolve(outFileName).toString
           processFile(filePath, fileData).map { fileSize =>
-            HttpResponse(StatusCodes.OK, entity = s"File successfully uploaded. Fil size is $fileSize")
+            HttpResponse(StatusCodes.OK, entity = s"File successfully uploaded. File size is $fileSize")
           }.recover {
             case ex: Exception => HttpResponse(StatusCodes.InternalServerError, entity = "Error in file uploading")
           }
@@ -61,18 +61,14 @@ object HttpUpload extends App with StrictLogging {
 
   private def processFile(filePath: String, fileData: Multipart.FormData): Future[Int] = {
     val fileOutput = new FileOutputStream(filePath)
-    val chunkSize = 50000
 
-    val source = fileData.parts.mapAsync(1) { bodyPart ⇒
-      def writeFile(count: Int, byteString: Seq[ByteString]) = {
-        val byteArray = byteString.foldLeft(Array[Byte]())((a, bs) => a ++ bs)
-        logger.debug("group length = {}", byteArray.length)
+    val source = fileData.parts.mapAsync(4) { bodyPart ⇒
+      def writeFile(count: Int, byteString: ByteString) = {
+        val byteArray = byteString.toArray
         fileOutput.write(byteArray)
         count + byteArray.length
       }
-      bodyPart.entity.dataBytes
-        .grouped(chunkSize)
-        .runFold(0)(writeFile)
+      bodyPart.entity.dataBytes.runFold(0)(writeFile)
     }
     source.runFold(0)(_ + _)
   }
