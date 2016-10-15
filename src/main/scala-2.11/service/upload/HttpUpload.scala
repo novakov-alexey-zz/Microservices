@@ -2,22 +2,24 @@ package service.upload
 
 import java.io.FileOutputStream
 import java.nio.file.Paths
+import java.util.Date
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpResponse, Multipart, StatusCodes}
+import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{FileIO, Flow}
+import akka.stream.scaladsl.FileIO
 import akka.util.ByteString
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 object HttpUpload extends App with StrictLogging {
-  implicit val system = ActorSystem()
+  implicit val system = ActorSystem("HttpUploadService")
   implicit val executor = system.dispatcher
   implicit val materializer = ActorMaterializer()
 
@@ -28,13 +30,21 @@ object HttpUpload extends App with StrictLogging {
       post {
         fileUpload("csv") {
           case (metadata, byteSource) =>
-            val outFileName = System.currentTimeMillis() + "_" + metadata.fileName
+            val startTime = System.currentTimeMillis()
+            val outFileName = startTime + "_" + metadata.fileName
             val sink = FileIO.toPath(Paths.get(conf.getString("upload.output-path")).resolve(outFileName))
             val writeResult = byteSource.runWith(sink)
+
             onSuccess(writeResult) { result =>
               result.status match {
-                case Success(_) => complete(s"Successfully written ${result.count} bytes\n")
-                case Failure(e) => complete(HttpResponse(StatusCodes.InternalServerError, entity = "Error in file uploading\n"))
+                case Success(_) =>
+                  val elapsedTime = (System.currentTimeMillis() - startTime).milliseconds
+                  logger.info(s"file: $outFileName, time elapsed: ${elapsedTime.toSeconds}")
+                  complete(s"Successfully written ${result.count} bytes\n")
+
+                case Failure(e) =>
+                  logger.error(s"Fail on file: $outFileName, start time: ${new Date(startTime)}", e)
+                  complete(HttpResponse(StatusCodes.InternalServerError, entity = "Error in file uploading\n"))
               }
             }
         }
