@@ -56,36 +56,6 @@ trait HttpUploadRoute extends StrictLogging {
         }
       }
     }
-
-  //  def uploadFile2(conf: Config) = {
-  //    path("upload" / "csv") {
-  //      (post & entity(as[Multipart.FormData])) { fileData =>
-  //        complete {
-  //          val outFileName = System.currentTimeMillis() + ".csv"
-  //          val filePath = Paths.get(conf.getString("upload.output-path")).resolve(outFileName).toString
-  //          processFile(filePath, fileData).map { fileSize =>
-  //            HttpResponse(StatusCodes.OK, entity = s"File successfully uploaded. File size is $fileSize\n")
-  //          }.recover {
-  //            case ex: Exception => HttpResponse(StatusCodes.InternalServerError, entity = "Error in file uploading\n")
-  //          }
-  //        }
-  //      }
-  //    }
-  //  }
-  //
-  //  private def processFile(filePath: String, fileData: Multipart.FormData): Future[Int] = {
-  //    val fileOutput = new FileOutputStream(filePath)
-  //
-  //    val source = fileData.parts.mapAsync(4) { bodyPart ⇒
-  //      def writeFile(count: Int, byteString: ByteString) = {
-  //        val byteArray = byteString.toArray
-  //        fileOutput.write(byteArray)
-  //        count + byteArray.length
-  //      }
-  //      bodyPart.entity.dataBytes.runFold(0)(writeFile)
-  //    }
-  //    source.runFold(0)(_ + _)
-  //  }
 }
 
 object HttpUploadService extends App with HttpUploadRoute {
