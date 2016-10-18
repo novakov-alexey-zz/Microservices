@@ -2,9 +2,10 @@ package service.dataprocessor
 
 import java.nio.file.Paths
 
+import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.stream.scaladsl.{FileIO, Framing}
-import akka.stream.{ActorMaterializer, Materializer}
+import akka.stream.scaladsl.{Balance, FileIO, Flow, Framing, GraphDSL, Merge}
+import akka.stream.{ActorMaterializer, FlowShape, Graph, Materializer}
 import akka.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
@@ -43,15 +44,33 @@ trait CsvStream extends StrictLogging {
       .onComplete(result => {
         result match {
           case Success(r) =>
-            logger.info(s"processed: ${r.keySet.size}")
-            r.foreach { case (key, value) => logger.debug(key.utf8String + "->" + value.utf8String) }
+            logger.info(s"result line count: ${r.keySet.size}")
+            r.foreach { case (key, value) => logger.debug(s"${key.utf8String}->${value.utf8String}") }
           case Failure(e) => logger.error("Stream failed.", e)
         }
         system.terminate()
-        logger.info(s"elapsed time: ${(System.currentTimeMillis() - startTime) / 1000} sec")
+        logger.info(s"elapsed time: ${(System.currentTimeMillis() - startTime) / 1000} sec") // 82 sec
       })
   }
 }
+
+object WorkerPool {
+  def apply[In, Out](worker: Flow[In, Out, Any], workerCount: Int): Graph[FlowShape[In, Out], NotUsed] = {
+
+    GraphDSL.create() { implicit b =>
+      import akka.stream.scaladsl.GraphDSL.Implicits._
+
+      val balance = b.add(Balance[In](workerCount))
+      val resultsMerge = b.add(Merge[Out](workerCount))
+
+      for (i <- 0 until workerCount)
+        balance.out(i) ~> worker ~> resultsMerge.in(i)
+
+      FlowShape(balance.in, resultsMerge.out)
+    }
+  }
+}
+
 
 object DataProcessorService extends App with CsvStream {
   override implicit val system = ActorSystem("DataProcessorService")
