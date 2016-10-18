@@ -9,7 +9,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.stream.scaladsl.FileIO
 import akka.stream.{ActorMaterializer, Materializer}
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.ExecutionContextExecutor
@@ -23,7 +23,7 @@ trait HttpUploadRoute extends StrictLogging {
 
   implicit val materializer: Materializer
 
-  val conf = ConfigFactory.load()
+  val conf: Config
 
   val uploadFile =
     path("upload" / "csv") {
@@ -64,6 +64,8 @@ object HttpUploadService extends App with HttpUploadRoute {
   override implicit def executor = system.dispatcher
 
   override implicit val materializer = ActorMaterializer()
+
+  override val conf = ConfigFactory.load()
 
   Http().bindAndHandle(uploadFile, interface = "localhost", port = 8080)
 }

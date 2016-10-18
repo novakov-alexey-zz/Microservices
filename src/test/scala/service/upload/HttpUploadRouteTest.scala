@@ -6,11 +6,14 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, Multipart, StatusCodes}
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import akka.testkit._
+import com.typesafe.config.ConfigFactory
 import org.scalatest.{Matchers, WordSpec}
 
 import scala.concurrent.duration._
 
 class HttpUploadRouteTest extends WordSpec with Matchers with ScalatestRouteTest with HttpUploadRoute {
+
+  override val conf = ConfigFactory.load()
 
   implicit def default(implicit system: ActorSystem) = RouteTestTimeout(10.second.dilated)
 
