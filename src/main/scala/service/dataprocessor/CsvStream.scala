@@ -3,16 +3,17 @@ package service.dataprocessor
 import java.nio.file.Paths
 
 import akka.actor.ActorSystem
-import akka.stream.scaladsl.{FileIO, Framing, Keep, Sink}
+import akka.stream.scaladsl.{FileIO, Framing}
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.scalalogging.StrictLogging
 
 import scala.collection.mutable
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.ExecutionContextExecutor
 import scala.util.{Failure, Success}
 
-trait CsvStream {
+trait CsvStream extends StrictLogging {
   implicit val system: ActorSystem
 
   implicit def executor: ExecutionContextExecutor
@@ -22,41 +23,32 @@ trait CsvStream {
   val conf: Config
 
   def startCsvStream() = {
-    //TODO: take full path from Kafka message maybe or just file name?
+    //TODO: take file name from Kafka message
     val inputFile = "1476729028285_data_test.csv"
     val inputPath = Paths.get(conf.getString("data-processor.input-path")).resolve(inputFile)
     val fileSource = FileIO.fromPath(inputPath)
 
     val fileSink = FileIO.toPath(Paths.get(conf.getString("data-processor.processed-path")).resolve(inputFile))
+    //TODO: move startTime, so that it has to be initialized per each Kafka message processed
     val startTime = System.currentTimeMillis()
 
-    val delim = ByteString("\n")
-    fileSource
-      .via(Framing.delimiter(delim, Int.MaxValue, allowTruncation = true))
+    val rowDelim = ByteString("\n")
+    val comma = ','.toByte
 
-      //.grouped(5000)
-//      .map(_.foldLeft(mutable.HashMap.empty[String, ByteString])((map, bs) => {
-//        map += (bs.utf8String.takeWhile(_ != ',') -> bs)
-//      }))
-      //.mapAsync(8)(map => Future(map))
-//      .mapConcat(ls => new scala.collection.immutable.Iterable[ByteString]() {
-//        def iterator = ls.values.iterator
-//      })
-      //.runWith(Sink.foreach(bs => println(bs.utf8String)))
-          //.map(bs => bs.utf8String.split(","))
-        .runFold(mutable.HashMap.empty[String, ByteString])((map, bs) => {
-              map += bs.utf8String.takeWhile(_ != ',') -> bs
-        })
-      //.toMat(fileSink)(Keep.right).run()
+    fileSource
+      .via(Framing.delimiter(rowDelim, Int.MaxValue, allowTruncation = true))
+      .runFold(mutable.HashMap.empty[ByteString, ByteString])((map, bs) => {
+        map += bs.takeWhile(_ != comma) -> bs
+      })
       .onComplete(result => {
         result match {
           case Success(r) =>
-            println(s"processed: ${r.keySet.size}, ${r.keySet}")
-            r foreach {case (key, value) => println (key + "->" + value.utf8String)}
-          case Failure(e) => println(e)
+            logger.info(s"processed: ${r.keySet.size}")
+            r.foreach { case (key, value) => logger.debug(key.utf8String + "->" + value.utf8String) }
+          case Failure(e) => logger.error("Stream failed.", e)
         }
         system.terminate()
-        println(s"elapsed time: ${(System.currentTimeMillis() - startTime) / 1000} sec") //107
+        logger.info(s"elapsed time: ${(System.currentTimeMillis() - startTime) / 1000} sec")
       })
   }
 }
