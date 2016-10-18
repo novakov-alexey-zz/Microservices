@@ -35,11 +35,14 @@ trait CsvStream extends StrictLogging {
 
     val rowDelim = ByteString("\n")
     val comma = ','.toByte
+    val uniqueGroupFlow: Flow[ByteString, mutable.HashMap[ByteString, ByteString], NotUsed] =
+      Flow[ByteString].via(UniqueGroup(50000, bs => bs.takeWhile(_ != comma) -> bs))
 
     fileSource
       .via(Framing.delimiter(rowDelim, Int.MaxValue, allowTruncation = true))
-      .runFold(mutable.HashMap.empty[ByteString, ByteString])((map, bs) => {
-        map += bs.takeWhile(_ != comma) -> bs
+      .via(WorkerPool(uniqueGroupFlow, 8))
+      .runFold(mutable.HashMap.empty[ByteString, ByteString])((acc, map) => {
+        acc ++= map
       })
       .onComplete(result => {
         result match {
