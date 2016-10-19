@@ -7,13 +7,17 @@ import scala.collection.mutable
 
 case class UniqueGroup[T](n: Int, elemMapper: T => (T, T)) extends GraphStage[FlowShape[T, mutable.HashMap[T, T]]] {
   require(n > 0, "n must be greater than 0")
-
   val in = Inlet[T]("Grouped.in")
   val out = Outlet[mutable.HashMap[T, T]]("Grouped.out")
+
   override val shape: FlowShape[T, mutable.HashMap[T, T]] = FlowShape(in, out)
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =
     new GraphStageLogic(shape) with InHandler with OutHandler {
+      println("Create new UniqueGroup >>>>")
+      UniqueGroup.i += 1
+      val id = UniqueGroup.i
+      var cycle = 0
 
       private val buf = {
         val b = mutable.HashMap.empty[T, T]
@@ -23,14 +27,14 @@ case class UniqueGroup[T](n: Int, elemMapper: T => (T, T)) extends GraphStage[Fl
       var left = n
 
       override def onPush(): Unit = {
-        if (left == n) buf.clear()
-
-        val elem = grab(in)
-        buf += elemMapper(elem)
+        buf += elemMapper(grab(in))
         left -= 1
         if (left == 0) {
+          val elements = buf.result()
+          buf.clear()
           left = n
-          push(out, buf.result())
+          push(out, elements)
+          cycle += 1
         } else {
           pull(in)
         }
@@ -48,9 +52,14 @@ case class UniqueGroup[T](n: Int, elemMapper: T => (T, T)) extends GraphStage[Fl
           push(out, buf)
         }
         completeStage()
+        println(s"unique group finished # $id, cycles count = $cycle $this" )
       }
 
       setHandlers(in, out, this)
     }
 
+}
+
+object UniqueGroup {
+  var i = 0
 }

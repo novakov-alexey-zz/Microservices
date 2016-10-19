@@ -11,7 +11,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.collection.mutable
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
 trait CsvStream extends StrictLogging {
@@ -35,12 +35,12 @@ trait CsvStream extends StrictLogging {
 
     val rowDelim = ByteString("\n")
     val comma = ','.toByte
-    val uniqueGroupFlow: Flow[ByteString, mutable.HashMap[ByteString, ByteString], NotUsed] =
-      Flow[ByteString].via(UniqueGroup(50000, bs => bs.takeWhile(_ != comma) -> bs))
+    val uniqueGroupFlow = Flow[ByteString]
+      .via[mutable.HashMap[ByteString, ByteString], NotUsed] (UniqueGroup(5000, bs => bs.takeWhile(_ != comma) -> bs))
 
     fileSource
       .via(Framing.delimiter(rowDelim, Int.MaxValue, allowTruncation = true))
-      .via(WorkerPool(uniqueGroupFlow, 8))
+      .via(WorkerPool(uniqueGroupFlow, 1))
       .runFold(mutable.HashMap.empty[ByteString, ByteString])((acc, map) => {
         acc ++= map
       })
