@@ -4,15 +4,18 @@ import java.nio.file.Paths
 
 import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Balance, FileIO, Flow, Framing, GraphDSL, Merge}
-import akka.stream.{ActorMaterializer, FlowShape, Graph, Materializer}
+import akka.event.Logging
+import akka.stream._
+import akka.stream.scaladsl.{FileIO, Flow, Framing}
 import akka.util.ByteString
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
+import service.dataprocessor.RecordTransformation.recordToEvent
+import service.dataprocessor.dal.{Event, EventDao}
 
 import scala.collection.mutable
-import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.util.{Failure, Success}
+import scala.concurrent.ExecutionContextExecutor
+import scala.util.{Failure, Success, Try}
 
 trait CsvStream extends StrictLogging {
   implicit val system: ActorSystem
@@ -23,8 +26,7 @@ trait CsvStream extends StrictLogging {
 
   val conf: Config
 
-  def startCsvStream() = {
-    //TODO: take file name from Kafka message
+  def startCsvStream(eventDao: EventDao) = {
     val inputFile = "1476729028285_data_test.csv"
     val inputPath = Paths.get(conf.getString("data-processor.input-path")).resolve(inputFile)
     val fileSource = FileIO.fromPath(inputPath)
@@ -34,46 +36,69 @@ trait CsvStream extends StrictLogging {
     val startTime = System.currentTimeMillis()
 
     val rowDelim = ByteString("\n")
-    val comma = ','.toByte
-    val uniqueGroupFlow = Flow[ByteString]
-      .via[mutable.HashMap[ByteString, ByteString], NotUsed] (UniqueGroup(5000, bs => bs.takeWhile(_ != comma) -> bs))
 
     fileSource
       .via(Framing.delimiter(rowDelim, Int.MaxValue, allowTruncation = true))
-      .via(WorkerPool(uniqueGroupFlow, 1))
-      .runFold(mutable.HashMap.empty[ByteString, ByteString])((acc, map) => {
-        acc ++= map
-      })
+      .fold(mutable.HashMap.empty[ByteString, ByteString])(Deduplication())
+      .log("record count", _.keySet.size)
+      .log("records", _.foreach { case (key, value) => logger.debug(s"${key.utf8String}->${value.utf8String}") })
+      .withAttributes(Attributes.logLevels(onElement = Logging.InfoLevel))
+      .via(EventStore(eventDao))
+      .runReduce((a, _) => a)
       .onComplete(result => {
         result match {
           case Success(r) =>
-            logger.info(s"result line count: ${r.keySet.size}")
-            r.foreach { case (key, value) => logger.debug(s"${key.utf8String}->${value.utf8String}") }
+          //logger.info(s"result line count: ${r.keySet.size}")
+          //r.foreach { case (key, value) => logger.debug(s"${key.utf8String}->${value.utf8String}") }
           case Failure(e) => logger.error("Stream failed.", e)
         }
         system.terminate()
         logger.info(s"elapsed time: ${(System.currentTimeMillis() - startTime) / 1000} sec") // 82 sec
       })
   }
+
+  object Deduplication {
+    val comma = ','.toByte
+
+    type FoldToMap = (mutable.HashMap[ByteString, ByteString], ByteString) => mutable.HashMap[ByteString, ByteString]
+
+    def apply(): FoldToMap = {
+      (map, bs) => {
+        map += bs.takeWhile(_ != comma) -> bs
+      }
+    }
+  }
+
 }
 
-object WorkerPool {
-  def apply[In, Out](worker: Flow[In, Out, Any], workerCount: Int): Graph[FlowShape[In, Out], NotUsed] = {
+object EventStore {
 
-    GraphDSL.create() { implicit b =>
-      import akka.stream.scaladsl.GraphDSL.Implicits._
+  def apply(eventDao: EventDao): Flow[mutable.HashMap[ByteString, ByteString], Unit, NotUsed] =
+    Flow.fromFunction(records =>
+      records
+        .filterKeys(isNumeric)
+        .values
+        .map(_.utf8String.split(delim))
+        .filter(nonEmptyFields)
+        .map(recordToEvent)
+        .foreach(eventDao.insertEvent)
+    )
 
-      val balance = b.add(Balance[In](workerCount))
-      val resultsMerge = b.add(Merge[Out](workerCount))
+  val isNumeric: (ByteString) => Boolean = bs => Try(bs.utf8String.toLong).isSuccess
 
-      for (i <- 0 until workerCount)
-        balance.out(i) ~> worker ~> resultsMerge.in(i)
-
-      FlowShape(balance.in, resultsMerge.out)
-    }
+  def nonEmptyFields: (Array[String]) => Boolean = {
+    a => a.isDefinedAt(1) && a.isDefinedAt(2) && a(1).nonEmpty && a(2).nonEmpty
   }
 }
 
+object RecordTransformation {
+  import service.dataprocessor.DateParser._
+
+  def recordToEvent(record: Array[String]): Event = {
+    println("to event = " + record.mkString(", "))
+    Event(id = record(0).toLong, name = record(1), timeOfStart = record(2))
+  }
+}
 
 object DataProcessorService extends App with CsvStream {
   override implicit val system = ActorSystem("DataProcessorService")
@@ -84,5 +109,6 @@ object DataProcessorService extends App with CsvStream {
 
   override val conf = ConfigFactory.load()
 
-  startCsvStream()
+  val eventDao = Modules.injector.getInstance(classOf[EventDao])
+  startCsvStream(eventDao)
 }
