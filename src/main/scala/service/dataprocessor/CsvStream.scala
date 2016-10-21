@@ -52,7 +52,7 @@ trait CsvStream extends StrictLogging {
           //r.foreach { case (key, value) => logger.debug(s"${key.utf8String}->${value.utf8String}") }
           case Failure(e) => logger.error("Stream failed.", e)
         }
-        system.terminate()
+        //system.terminate()
         logger.info(s"elapsed time: ${(System.currentTimeMillis() - startTime) / 1000} sec") // 82 sec
       })
   }
@@ -60,15 +60,14 @@ trait CsvStream extends StrictLogging {
   object Deduplication {
     val comma = ','.toByte
 
-    type FoldToMap = (mutable.HashMap[ByteString, ByteString], ByteString) => mutable.HashMap[ByteString, ByteString]
+    type Map = mutable.HashMap[ByteString, ByteString]
 
-    def apply(): FoldToMap = {
+    def apply(): (Map, ByteString) => Map = {
       (map, bs) => {
         map += bs.takeWhile(_ != comma) -> bs
       }
     }
   }
-
 }
 
 object EventStore {
@@ -86,9 +85,9 @@ object EventStore {
 
   val isNumeric: (ByteString) => Boolean = bs => Try(bs.utf8String.toLong).isSuccess
 
-  def nonEmptyFields: (Array[String]) => Boolean = {
-    a => a.isDefinedAt(1) && a.isDefinedAt(2) && a(1).nonEmpty && a(2).nonEmpty
-  }
+  def nonEmptyFields: (Array[String]) => Boolean = a =>
+    a.isDefinedAt(1) && a(1).nonEmpty &&
+      a.isDefinedAt(2) && a(2).nonEmpty
 }
 
 object RecordTransformation {

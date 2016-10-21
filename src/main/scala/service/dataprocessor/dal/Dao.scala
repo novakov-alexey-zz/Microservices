@@ -12,15 +12,15 @@ trait EventDao {
 class EventDaoImpl extends EventDao {
   val db = Modules.persistenceContext
 
-  override def insertEvent(e: Event): Unit = {}
-  //  db.transaction { implicit session => EventDaoMapping.insertEvent(e) }
+  override def insertEvent(e: Event): Unit =
+    db.transaction { implicit session => EventDaoMapping.insertEvent(e) }
 }
 
 object EventDaoMapping {
   val insertEvent = new Insert[Event] {
     override def xsql =
       <xsql>
-        INSERT INTO Event (id, name, timeOfStart)
+        INSERT INTO dbo.Event (EVENT_ID, NAME, TIME_OF_START)
         VALUES (#{{id}}, #{{name}}, #{{timeOfStart, typeHandler = service.dataprocessor.dal.LocalDateTimeTypeHandler}})
       </xsql>
   }
