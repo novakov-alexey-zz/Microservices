@@ -1,6 +1,6 @@
 package service.dataprocessor
 
-import java.nio.file.Paths
+import java.nio.file._
 
 import akka.NotUsed
 import akka.actor.ActorSystem
@@ -31,7 +31,6 @@ trait CsvStream extends StrictLogging {
     val inputPath = Paths.get(conf.getString("data-processor.input-path")).resolve(inputFile)
     val fileSource = FileIO.fromPath(inputPath)
 
-    val fileSink = FileIO.toPath(Paths.get(conf.getString("data-processor.processed-path")).resolve(inputFile))
     //TODO: move startTime, so that it has to be initialized per each Kafka message processed
     val startTime = System.currentTimeMillis()
 
@@ -41,20 +40,25 @@ trait CsvStream extends StrictLogging {
       .via(Framing.delimiter(rowDelim, Int.MaxValue, allowTruncation = true))
       .fold(mutable.HashMap.empty[ByteString, ByteString])(Deduplication())
       .log("record count", _.keySet.size)
-      .log("records", _.foreach { case (key, value) => logger.debug(s"${key.utf8String}->${value.utf8String}") })
+      .log("records", _.foreach { case (key, value) => s"${key.utf8String}->${value.utf8String}\n" })
       .withAttributes(Attributes.logLevels(onElement = Logging.InfoLevel))
       .via(EventStore(eventDao))
       .runReduce((a, _) => a)
       .onComplete(result => {
         result match {
           case Success(r) =>
-          //logger.info(s"result line count: ${r.keySet.size}")
-          //r.foreach { case (key, value) => logger.debug(s"${key.utf8String}->${value.utf8String}") }
+            //logger.info(s"result line count: ${r.keySet.size}")
+            //r.foreach { case (key, value) => logger.debug(s"${key.utf8String}->${value.utf8String}") }
+            moveFile(inputFile, inputPath)
           case Failure(e) => logger.error("Stream failed.", e)
         }
-        //system.terminate()
         logger.info(s"elapsed time: ${(System.currentTimeMillis() - startTime) / 1000} sec") // 82 sec
       })
+  }
+
+  def moveFile(inputFile: String, inputPath: Path) = {
+    val outPath = Paths.get(conf.getString("data-processor.processed-path")).resolve(inputFile)
+    Files.move(inputPath, outPath, StandardCopyOption.ATOMIC_MOVE)
   }
 
   object Deduplication {
@@ -68,6 +72,7 @@ trait CsvStream extends StrictLogging {
       }
     }
   }
+
 }
 
 object EventStore {
@@ -91,6 +96,7 @@ object EventStore {
 }
 
 object RecordTransformation {
+
   import service.dataprocessor.DateParser._
 
   def recordToEvent(record: Array[String]): Event = {
