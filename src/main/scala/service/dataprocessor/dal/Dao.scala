@@ -20,12 +20,16 @@ object EventDaoMapping {
   val insertEvent = new Insert[Event] {
     override def xsql =
       <xsql>
-        INSERT INTO dbo.Event (EVENT_ID, NAME, TIME_OF_START)
-        VALUES (#{{id}}, #{{name}}, #{{timeOfStart, typeHandler = service.dataprocessor.dal.LocalDateTimeTypeHandler}})
+        INSERT INTO dbo.Event (EVENT_ID, NAME, TIME_OF_START, FILE_NAME)
+        VALUES (
+        #{{id}},
+        #{{name}},
+        #{{timeOfStart, typeHandler = service.dataprocessor.dal.LocalDateTimeTypeHandler}},
+        #{{fileName}})
       </xsql>
   }
 
   def bind: Seq[Statement] = Seq(insertEvent)
 }
 
-case class Event(id: Long, name: String, timeOfStart: LocalDateTime)
+case class Event(id: Long, name: String, timeOfStart: LocalDateTime, fileName: String)

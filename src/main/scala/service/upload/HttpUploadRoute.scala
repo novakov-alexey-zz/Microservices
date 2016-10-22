@@ -43,12 +43,13 @@ trait HttpUploadRoute extends StrictLogging {
                 HttpResponse(StatusCodes.InternalServerError, entity = "Error in file uploading\n")
               }
 
-              writeResult.map(result =>
-                result.status match {
+              writeResult.map(r =>
+                r.status match {
                   case Success(_) =>
                     val elapsedTime = (System.currentTimeMillis() - startTime).milliseconds
-                    logger.info(s"file: $outFileName, time elapsed: ${elapsedTime.toSeconds}")
-                    HttpResponse(StatusCodes.OK, entity = s"Successfully written ${result.count} bytes\n")
+                    logger.info(s"file uploaded: $outFileName, time spent: ${elapsedTime.toSeconds} sec")
+                    notifyDataProcessor(outFileName)
+                    HttpResponse(StatusCodes.OK, entity = s"Successfully written ${r.count} bytes\n")
 
                   case Failure(e) => errorResponse(e)
                 }).recover { case e => errorResponse(e) }
@@ -56,6 +57,14 @@ trait HttpUploadRoute extends StrictLogging {
         }
       }
     }
+
+  def notifyDataProcessor(fileName: String) = {
+    val dataProcessorUri = s"http://localhost:8081/process/csv/$fileName"
+    Http().singleRequest(HttpRequest(uri = dataProcessorUri, method = HttpMethods.POST)).onComplete {
+      case Success(response) => logger.info(s"data processor response: '$response' for file = $fileName")
+      case Failure(e) => logger.error(s"Failed to send request to $dataProcessorUri")
+    }
+  }
 }
 
 object HttpUploadService extends App with HttpUploadRoute {
@@ -67,5 +76,5 @@ object HttpUploadService extends App with HttpUploadRoute {
 
   override val conf = ConfigFactory.load()
 
-  Http().bindAndHandle(uploadFile, interface = "localhost", port = 8080)
+  Http().bindAndHandle(uploadFile, interface = "localhost", port = conf.getInt("upload.http-port"))
 }

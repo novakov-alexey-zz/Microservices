@@ -8,7 +8,7 @@
             <transactionManager type="JDBC"/>
             <dataSource type="POOLED">
                 <property name="driver" value="org.h2.Driver" />
-                <property name="url" value="jdbc:h2:mem:event_stream;MV_STORE=FALSE;MVCC=FALSE;INIT=RUNSCRIPT FROM '/Users/alexey/IdeaProjects/Microservices/src/main/resources/create_schema.sql'" />
+                <property name="url" value="jdbc:h2:~/event_stream;MV_STORE=FALSE;MVCC=FALSE;INIT=RUNSCRIPT FROM 'classpath:create_schema.sql'" />
                 <property name="username" value="sa" />
                 <property name="password" value="sa" />
                 <property name="poolMaximumActiveConnections" value="5"/>
