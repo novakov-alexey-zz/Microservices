@@ -3,10 +3,15 @@ package service
 import java.time.format.DateTimeFormatter
 import java.time.{LocalDateTime, ZoneId, ZoneOffset}
 
+import akka.util.ByteString
+
+import scala.collection.mutable
 import scala.util.Try
 
 package object dataprocessor {
-  val delim = ","
+  type MutableMap = mutable.HashMap[ByteString, ByteString]
+
+  val comma = ','
 
   object DateParser {
     val formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy[ [HH][:mm][:ss]]")

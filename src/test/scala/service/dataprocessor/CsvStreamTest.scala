@@ -1,26 +1,31 @@
 package service.dataprocessor
 
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.testkit.ScalatestRouteTest
-import com.typesafe.config.{Config, ConfigFactory}
+import akka.actor.ActorSystem
+import akka.stream.ActorMaterializer
+import com.typesafe.config.ConfigFactory
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FlatSpec, Matchers}
-import service.dataprocessor.dal.EventDao
+import service.dataprocessor.dal.{Event, EventDao}
 
-class CsvStreamTest extends FlatSpec with Matchers with MockFactory with ScalatestRouteTest with CsvStream {
+class CsvStreamTest extends FlatSpec with Matchers with MockFactory with ScalaFutures with CsvStream {
+  override implicit val system = ActorSystem("DataProcessorServiceTest")
 
-  override val conf: Config = ConfigFactory.load()
+  override implicit def executor = system.dispatcher
 
-  it should "return Ok and accepted message when sending process/csv request" in {
+  override implicit val materializer = ActorMaterializer()
+
+  override val conf = ConfigFactory.load()
+
+  it should "get only unique events from input csv file and store to db" in {
     //given
+    val fileName = "test.csv"
     val eventDao = stub[EventDao]
-    val fileName = "test_file.csv"
-
     //when
-    Post(s"/process/csv/$fileName") ~> csvStream(eventDao) ~> check {
+    val result = startCsvStream(fileName, eventDao)
+    whenReady(result) { _ =>
       //then
-      status shouldBe StatusCodes.OK
-      responseAs[String] shouldEqual s"File accepted $fileName"
+      eventDao.insertEvent _ verify * repeat 2
     }
   }
 }

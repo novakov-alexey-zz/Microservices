@@ -14,7 +14,7 @@ val loggingLogback  = "ch.qos.logback"              %  "logback-classic"        
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-http-experimental" % akkaVersion,
-//  "mysql" % "mysql-connector-java" % "5.1.16",
+  "com.typesafe.akka" %% "akka-stream-kafka" % "0.13",
   "com.h2database" % "h2" % "1.4.192",
   "org.mybatis.scala" % "mybatis-scala-core_2.11" % "1.0.3",
   "com.google.inject" % "guice" % "4.0",
