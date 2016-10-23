@@ -59,11 +59,12 @@ trait HttpUploadRoute extends StrictLogging {
     }
 
   def notifyDataProcessor(fileName: String) = {
-    val dataProcessorUri = s"http://localhost:8081/process/csv/$fileName"
-    Http().singleRequest(HttpRequest(uri = dataProcessorUri, method = HttpMethods.POST)).onComplete {
-      case Success(response) => logger.info(s"data processor response: '$response' for file = $fileName")
-      case Failure(e) => logger.error(s"Failed to send request to $dataProcessorUri")
-    }
+    val dataProcessorUri = conf.getString("upload.data-processor-uri") + s"/$fileName"
+    Http().singleRequest(HttpRequest(uri = dataProcessorUri, method = HttpMethods.POST))
+      .onComplete {
+        case Success(response) => logger.info(s"data processor response: '$response' for file = $fileName")
+        case Failure(e) => logger.error(s"Failed to send request to $dataProcessorUri")
+      }
   }
 }
 

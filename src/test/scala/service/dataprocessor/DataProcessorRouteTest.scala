@@ -16,7 +16,7 @@ class DataProcessorRouteTest extends FlatSpec with Matchers with MockFactory wit
 
   def startCsvStream(fileName: String, eventDao: EventDao): Future[Unit] = Future.successful({})
 
-  it should "return Ok and accepted message when sending process/csv request" in {
+  it should "return Ok and accepting message when sending 'process/csv' request" in {
     //given
     val eventDao = stub[EventDao]
     val fileName = "test_file.csv"

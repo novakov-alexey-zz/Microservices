@@ -20,6 +20,7 @@ import scala.util.Try
 
 trait DataProcessorRoute extends StrictLogging {
   val conf: Config
+
   implicit def executor: ExecutionContextExecutor
 
   def startCsvStream(fileName: String, eventDao: EventDao): Future[Unit]
@@ -27,10 +28,9 @@ trait DataProcessorRoute extends StrictLogging {
   def csvStream(eventDao: EventDao) =
     path("process" / "csv" / Segment) { (fileName) =>
       post {
-        val dataProcessing = startCsvStream(fileName, eventDao)
-
-        dataProcessing.foreach(_ => logger.info(s"data processing has been completed. File: $fileName"))
-        dataProcessing.failed.foreach(e => logger.error("data processing stream failed", e))
+        val result = startCsvStream(fileName, eventDao)
+        result.foreach(_ => logger.info(s"data processing has been completed. File: $fileName"))
+        result.failed.foreach(e => logger.error("data processing stream failed", e))
 
         complete {
           HttpResponse(StatusCodes.OK, entity = s"File accepted $fileName")
@@ -64,6 +64,7 @@ trait CsvStream extends StrictLogging {
     result.map { r =>
       logResult(r)
       moveFile(fileName, inputPath)
+      logger.debug(s"File: $fileName. Spent time: ${(System.currentTimeMillis() - startTime) / 1000} sec")
     }.recover { case e =>
       logger.error(s"Stream failed. Input file: $fileName", e)
     }
@@ -139,5 +140,5 @@ object DataProcessorService extends App with DataProcessorRoute with CsvStream {
 
   val eventDao = Modules.injector.getInstance(classOf[EventDao])
 
-  Http().bindAndHandle(csvStream(eventDao), interface = "localhost", port = 8081)
+  Http().bindAndHandle(csvStream(eventDao), interface = "localhost", port = conf.getInt("data-processor.http-port"))
 }
