@@ -76,6 +76,8 @@ trait CsvStream extends StrictLogging {
 
   def moveFile(inputFile: String, inputPath: Path) = {
     val outPath = Paths.get(conf.getString("data-processor.processed-path")).resolve(inputFile)
+    val dirsCreated = outPath.getParent.toFile.mkdirs()
+    logger.debug(s"processed dirs were created: $dirsCreated")
     Files.move(inputPath, outPath, StandardCopyOption.ATOMIC_MOVE)
     logger.debug(s"File moved: $inputFile -> $outPath")
   }
