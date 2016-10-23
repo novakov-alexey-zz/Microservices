@@ -15,6 +15,7 @@ import service.dataprocessor.RecordTransformation.recordToEvent
 import service.dataprocessor.dal.{Event, EventDao}
 
 import scala.collection.mutable
+import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.Try
 
@@ -33,7 +34,7 @@ trait DataProcessorRoute extends StrictLogging {
         result.failed.foreach(e => logger.error("data processing stream failed", e))
 
         complete {
-          HttpResponse(StatusCodes.OK, entity = s"File accepted $fileName")
+          HttpResponse(StatusCodes.OK, entity = s"File accepted: $fileName")
         }
       }
     }
@@ -50,6 +51,8 @@ trait CsvStream extends StrictLogging {
 
   val rowDelim = ByteString("\n")
 
+  def emptyMap: MutableMap = mutable.HashMap.empty[ByteString, ByteString]
+
   def startCsvStream(fileName: String, eventDao: EventDao): Future[Unit] = {
     val startTime = System.currentTimeMillis()
     val inputPath = Paths.get(conf.getString("data-processor.input-path")).resolve(fileName)
@@ -58,13 +61,13 @@ trait CsvStream extends StrictLogging {
     val fileSource = FileIO.fromPath(inputPath)
     val result = fileSource
       .via(Framing.delimiter(rowDelim, Int.MaxValue, allowTruncation = true))
-      .fold(mutable.HashMap.empty[ByteString, ByteString])(Deduplication())
+      .fold(emptyMap)(Deduplication())
       .runWith(EventStorage(eventDao, fileName))
 
     result.map { r =>
       logResult(r)
       moveFile(fileName, inputPath)
-      logger.debug(s"File: $fileName. Spent time: ${(System.currentTimeMillis() - startTime) / 1000} sec")
+      logger.debug(s"File: $fileName. Spent time: ${(System.currentTimeMillis() - startTime).milliseconds.toSeconds} sec")
     }.recover { case e =>
       logger.error(s"Stream failed. Input file: $fileName", e)
     }
