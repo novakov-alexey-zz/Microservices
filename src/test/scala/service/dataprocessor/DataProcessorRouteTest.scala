@@ -25,7 +25,7 @@ class DataProcessorRouteTest extends FlatSpec with Matchers with MockFactory wit
     Post(s"/process/csv/$fileName") ~> csvStream(eventDao) ~> check {
       //then
       status shouldBe StatusCodes.OK
-      responseAs[String] shouldEqual s"File accepted $fileName"
+      responseAs[String] shouldEqual s"File accepted: $fileName"
     }
   }
 }
