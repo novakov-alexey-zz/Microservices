@@ -12,7 +12,7 @@ import scala.concurrent.Future
 class DataProcessorRouteTest extends FlatSpec with Matchers with MockFactory with ScalatestRouteTest
   with DataProcessorRoute {
 
-  override val conf: Config = ConfigFactory.load()
+  val conf: Config = ConfigFactory.load()
 
   def startCsvStream(fileName: String, eventDao: EventDao): Future[Unit] = Future.successful({})
 

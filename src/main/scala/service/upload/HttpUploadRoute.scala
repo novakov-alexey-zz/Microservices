@@ -69,13 +69,13 @@ trait HttpUploadRoute extends StrictLogging {
 }
 
 object HttpUploadService extends App with HttpUploadRoute {
-  override implicit val system = ActorSystem("HttpUploadService")
+  implicit val system = ActorSystem("HttpUploadService")
 
-  override implicit def executor = system.dispatcher
+  implicit def executor = system.dispatcher
 
-  override implicit val materializer = ActorMaterializer()
+  implicit val materializer = ActorMaterializer()
 
-  override val conf = ConfigFactory.load()
+  val conf = ConfigFactory.load()
 
   Http().bindAndHandle(uploadFile, interface = "localhost", port = conf.getInt("upload.http-port"))
 }

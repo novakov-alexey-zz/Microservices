@@ -15,15 +15,15 @@ import service.dataprocessor.dal.{Event, EventDao}
 import scala.concurrent.duration._
 
 class CsvStreamTest extends FlatSpec with Matchers with MockFactory with ScalaFutures with CsvStream {
-  override implicit val system = ActorSystem("DataProcessorServiceTest")
+  implicit val system = ActorSystem("DataProcessorServiceTest")
 
-  override implicit def executor = system.dispatcher
+  implicit def executor = system.dispatcher
 
-  override implicit val materializer = ActorMaterializer()
+  implicit val materializer = ActorMaterializer()
 
   implicit def default(implicit system: ActorSystem) = RouteTestTimeout(10.second.dilated)
 
-  override val conf = ConfigFactory.load()
+  val conf = ConfigFactory.load()
 
   it should "get only unique events from input csv file and store to db" in {
     //given

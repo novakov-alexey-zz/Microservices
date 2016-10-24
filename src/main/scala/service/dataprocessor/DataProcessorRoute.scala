@@ -133,13 +133,13 @@ object RecordTransformation {
 }
 
 object DataProcessorService extends App with DataProcessorRoute with CsvStream {
-  override implicit val system = ActorSystem("DataProcessorService")
+  implicit val system = ActorSystem("DataProcessorService")
 
-  override implicit def executor = system.dispatcher
+  implicit def executor = system.dispatcher
 
-  override implicit val materializer = ActorMaterializer()
+  implicit val materializer = ActorMaterializer()
 
-  override val conf = ConfigFactory.load()
+  val conf = ConfigFactory.load()
 
   val eventDao = Modules.injector.getInstance(classOf[EventDao])
 
