@@ -17,7 +17,7 @@ package object dataprocessor {
     val formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy[ [HH][:mm][:ss]]")
     val shortFormatter = DateTimeFormatter.ofPattern("dd-M-yy[ [HH][:mm][:ss]]")
 
-    implicit def str2date(str: String): LocalDateTime = {
+    implicit def str2UtcDateTime(str: String): LocalDateTime = {
       def parseBySecondFormat = Try(LocalDateTime.parse(str, shortFormatter)).toOption
 
       def defaultDate = LocalDateTime.now()

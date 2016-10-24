@@ -69,7 +69,7 @@ trait CsvStream extends StrictLogging {
     result.map { r =>
       logResult(r)
       moveFile(fileName, inputPath)
-      logger.debug(s"File: $fileName. Spent time: ${(System.currentTimeMillis() - startTime).milliseconds.toSeconds} sec")
+      logger.debug(s"File: $fileName. Spent time: ${(System.currentTimeMillis() - startTime).millis.toSeconds} sec")
     }.recover { case e =>
       logger.error(s"Stream failed. Input file: $fileName", e)
     }

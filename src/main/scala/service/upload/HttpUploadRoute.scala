@@ -50,7 +50,7 @@ trait HttpUploadRoute extends StrictLogging {
               writeResult.map(r =>
                 r.status match {
                   case Success(_) =>
-                    val elapsedTime = (System.currentTimeMillis() - startTime).milliseconds
+                    val elapsedTime = (System.currentTimeMillis() - startTime).millis
                     logger.info(s"file uploaded: $outFileName, time spent: ${elapsedTime.toSeconds} sec")
                     notifyDataProcessor(outFileName)
                     HttpResponse(StatusCodes.OK, entity = s"Successfully written ${r.count} bytes\n")
