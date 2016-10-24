@@ -50,12 +50,14 @@ trait CsvStream extends StrictLogging {
   val conf: Config
 
   val rowDelim = ByteString("\n")
+  lazy val inputPathPrefix = conf.getString("service.dataprocessor.input-path")
+  lazy val outPathPrefix = conf.getString("service.dataprocessor.processed-path")
 
   def emptyMap: MutableMap = mutable.HashMap.empty[ByteString, ByteString]
 
   def startCsvStream(fileName: String, eventDao: EventDao): Future[Unit] = {
     val startTime = System.currentTimeMillis()
-    val inputPath = Paths.get(conf.getString("data-processor.input-path")).resolve(fileName)
+    val inputPath = Paths.get(inputPathPrefix).resolve(fileName)
     logger.info(s"Start processing of file $inputPath, size = ${inputPath.toFile.length} bytes")
 
     val fileSource = FileIO.fromPath(inputPath)
@@ -79,7 +81,7 @@ trait CsvStream extends StrictLogging {
   }
 
   def moveFile(inputFile: String, inputPath: Path) = {
-    val outPath = Paths.get(conf.getString("data-processor.processed-path")).resolve(inputFile)
+    val outPath = Paths.get(outPathPrefix).resolve(inputFile)
     val dirsCreated = outPath.getParent.toFile.mkdirs()
     logger.debug(s"processed dirs were created: $dirsCreated")
     Files.move(inputPath, outPath, StandardCopyOption.ATOMIC_MOVE)
@@ -143,5 +145,5 @@ object DataProcessorService extends App with DataProcessorRoute with CsvStream {
 
   val eventDao = Modules.injector.getInstance(classOf[EventDao])
 
-  Http().bindAndHandle(csvStream(eventDao), interface = "localhost", port = conf.getInt("data-processor.http-port"))
+  Http().bindAndHandle(csvStream(eventDao), interface = "localhost", port = conf.getInt("service.dataprocessor.http-port"))
 }

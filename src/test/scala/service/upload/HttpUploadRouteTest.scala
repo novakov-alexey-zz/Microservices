@@ -13,7 +13,7 @@ import scala.concurrent.duration._
 
 class HttpUploadRouteTest extends WordSpec with Matchers with ScalatestRouteTest with HttpUploadRoute {
 
-  val conf = ConfigFactory.load()
+  val conf = ConfigFactory.load("test-application.conf")
 
   implicit def default(implicit system: ActorSystem) = RouteTestTimeout(10.second.dilated)
 

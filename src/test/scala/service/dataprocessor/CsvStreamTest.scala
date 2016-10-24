@@ -21,13 +21,13 @@ class CsvStreamTest extends FlatSpec with Matchers with MockFactory with ScalaFu
 
   implicit val materializer = ActorMaterializer()
 
-  implicit def default(implicit system: ActorSystem) = RouteTestTimeout(10.second.dilated)
+  implicit def default(implicit system: ActorSystem) = RouteTestTimeout(15.second.dilated)
 
-  val conf = ConfigFactory.load()
+  val conf = ConfigFactory.load("test-application.conf")
 
   it should "get only unique events from input csv file and store to db" in {
     //given
-    val dataDir = "target/data"
+    val dataDir = conf.getString("service.dataprocessor.input-path")
     val sampleDir = "src/test/resources"
     val fileName = "test.csv"
     val eventDao = mock[EventDao]

@@ -1,4 +1,5 @@
 .idea
 target
-#data folder for csv input and processed folders
-data
+project/project/
+#it will be created once you start service from project sources
+data/

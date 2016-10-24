@@ -25,6 +25,9 @@ trait HttpUploadRoute extends StrictLogging {
 
   val conf: Config
 
+  lazy val outputPath = conf.getString("service.upload.output-path")
+  lazy val dataProcessorPrefixUri = conf.getString("service.upload.dataprocessor-uri")
+
   val uploadFile =
     path("upload" / "csv") {
       post {
@@ -34,7 +37,8 @@ trait HttpUploadRoute extends StrictLogging {
             val outFileName = startTime + "_" + metadata.fileName
             logger.info(s"uploading file: $outFileName")
 
-            val sink = FileIO.toPath(Paths.get(conf.getString("upload.output-path")).resolve(outFileName))
+            Paths.get(outputPath).toFile.mkdirs()
+            val sink = FileIO.toPath(Paths.get(outputPath).resolve(outFileName))
             val writeResult = byteSource.runWith(sink)
 
             complete {
@@ -59,7 +63,7 @@ trait HttpUploadRoute extends StrictLogging {
     }
 
   def notifyDataProcessor(fileName: String) = {
-    val dataProcessorUri = conf.getString("upload.data-processor-uri") + s"/$fileName"
+    val dataProcessorUri = dataProcessorPrefixUri + s"/$fileName"
     Http().singleRequest(HttpRequest(uri = dataProcessorUri, method = HttpMethods.POST))
       .onComplete {
         case Success(response) => logger.info(s"data processor response: '$response' for file = $fileName")
@@ -77,5 +81,5 @@ object HttpUploadService extends App with HttpUploadRoute {
 
   val conf = ConfigFactory.load()
 
-  Http().bindAndHandle(uploadFile, interface = "localhost", port = conf.getInt("upload.http-port"))
+  Http().bindAndHandle(uploadFile, interface = "localhost", port = conf.getInt("service.upload.http-port"))
 }
