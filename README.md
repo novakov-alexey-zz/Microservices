@@ -9,5 +9,5 @@ sbt "runMain service.upload.HttpUploadService"
 sbt "runMain service.dataprocessor.DataProcessorService"
 
 #Test Workflow
-curl --form "csv=@\<path to CSV file\>" http://localhost:8080/upload/csv
+curl --form "csv=@\<path to CSV file\>" http://localhost:8080/upload/csv  
 Please see file CSV file format here: src/test/resources/test.csv
