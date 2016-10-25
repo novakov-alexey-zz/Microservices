@@ -34,10 +34,10 @@ trait HttpUploadRoute extends StrictLogging {
         fileUpload("csv") {
           case (metadata, byteSource) =>
             val startTime = System.currentTimeMillis()
-            val outFileName = startTime + "_" + metadata.fileName
+            val outFileName = s"${startTime}_${metadata.fileName}"
             logger.info(s"uploading file: $outFileName")
 
-            Paths.get(outputPath).toFile.mkdirs()
+            createOutputDirIfNeeded()
             val sink = FileIO.toPath(Paths.get(outputPath).resolve(outFileName))
             val writeResult = byteSource.runWith(sink)
 
@@ -62,7 +62,12 @@ trait HttpUploadRoute extends StrictLogging {
       }
     }
 
-  def notifyDataProcessor(fileName: String) = {
+  private def createOutputDirIfNeeded() = {
+    val output = Paths.get(outputPath).toFile
+    if(!output.exists()) output.mkdirs()
+  }
+
+  private def notifyDataProcessor(fileName: String) = {
     val dataProcessorUri = dataProcessorPrefixUri + s"/$fileName"
     Http().singleRequest(HttpRequest(uri = dataProcessorUri, method = HttpMethods.POST))
       .onComplete {
